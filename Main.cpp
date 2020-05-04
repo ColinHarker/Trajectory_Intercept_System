@@ -1,6 +1,6 @@
 /*
 * Author: Colin Harker
-* Computer vision program to track and calculate future trajectory of object.
+* Computer vision program to track and calculate trajectory of object in order to predict future position.
 * Designed to interface with Arduino and control servos.
 * _STATUS_: WIP
 */
@@ -19,10 +19,13 @@ int main(int argc, char** argv)
 {
     std::string filename = "test3.mov";
     cv::VideoCapture capture(filename);
-    cv::Mat frame, frame_HSV, combined;
+    //--for webcam--
+    //VideoCapture Capture;
+    //capture.open(0);
+    cv::Mat frame, frame_HSV;
 
     if (!capture.isOpened())
-        throw "Error when reading steam_avi";
+        throw "Error when reading mov";
 
     cv::namedWindow("w", 1);
     for (;;)
@@ -38,15 +41,15 @@ int main(int argc, char** argv)
         cv::blur(frame_HSV, frame_HSV, cv::Size(1, 1));
 
         //define threshhold around desired color
-        cv::Scalar lowerBound = cv::Scalar(25, 52, 30);
-        cv::Scalar upperBound = cv::Scalar(80, 210, 150);
-        cv::Mat threshFrame;
+        cv::Scalar lower_bound = cv::Scalar(25, 52, 30);
+        cv::Scalar upper_bound = cv::Scalar(80, 210, 150);
+        cv::Mat thresh_frame;
 
         //Convert desired object to white, everything else black
-        inRange(frame_HSV, lowerBound, upperBound, threshFrame);
+        cv::inRange(frame_HSV, lower_bound, upper_bound, thresh_frame);
 
         //calculate center of body
-        cv::Moments m = moments(threshFrame, false);
+        cv::Moments m = moments(thresh_frame, false);
         cv::Point com(m.m10 / m.m00, m.m01 / m.m00);
         
 
@@ -61,7 +64,7 @@ int main(int argc, char** argv)
 
     
         //display image
-        imshow("thresh", threshFrame);
+        imshow("thresh", thresh_frame);
         imshow("hsv", frame_HSV);
         imshow("w", frame);
 
@@ -91,5 +94,6 @@ int main(int argc, char** argv)
 
 
     cv::waitKey(0); // key press to close window
+    return 0;
 }
 
