@@ -82,7 +82,7 @@ int main(int argc, char** argv)
         //convert point to radian data that can be sent to arduino
 
 
-        //send data to arduino
+        //send data to arduino.
 
 
 
