@@ -2,6 +2,7 @@
 * Author: Colin Harker
 * Computer vision program to track and calculate trajectory of object in order to predict future position.
 * Designed to interface with Arduino and control servos.
+* License: MIT
 * _STATUS_: WIP
 * 
 * Citations:
