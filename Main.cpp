@@ -1,8 +1,19 @@
-/*
+﻿/*
 * Author: Colin Harker
 * Computer vision program to track and calculate trajectory of object in order to predict future position.
 * Designed to interface with Arduino and control servos.
+* License: MIT
 * _STATUS_: WIP
+* 
+* Citations:
+*   1. Trajectory Algorithm Based on research paper
+*       - "Real-time Trajectory Calculation and Prediction Using Neighborhood-Level Parallel Processing"
+*       -  Written by Mahir Kabeer Gharzai, Dingyi Hong, Joseph A. Schmitz, Michael W. Hoffman, Sina Balkır
+*       -  Published by: University of Nebraska–Lincoln Department of Electrical & Computer Engineering 
+*
+*   2. C++ Serial Port library
+*       - Author: Manash Kumar Mandal
+*       - Link: github.com/manashmandal/SerialPort
 */
 
 #include <thread>
@@ -38,6 +49,7 @@ int main(int argc, char** argv)
     int predicted_x;
     int predicted_y;
     int frame_count = 0;
+    cv::Point predicted_point;
 
     if (!capture.isOpened())
         throw "Error when reading mov";
@@ -88,11 +100,12 @@ int main(int argc, char** argv)
                 predicted_x = future_x.get;
                 predicted_y = future_y.get;
 
-                cv::Point predicted{ predicted_x, predicted_y };
-                sendData(predicted);
+                predicted_point = { predicted_x, predicted_y };
+                sendData(predicted_point);
                 
                 frame_count++;
             }
+            cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);
         }
 
         //display coord to terminal
@@ -105,20 +118,7 @@ int main(int argc, char** argv)
         cv::imshow("w", frame);
 
 
-
         cv::waitKey(15);
-
-
-        //after n number of frames, use marker locations to calculate predicted_x trajectory k frames in the future
-
-
-        //once trajectory is predicted_x, save coordinates to a Point
-
-
-        //convert point to degree data that can be sent to arduino
-
-     
-
 
     }
 
@@ -133,6 +133,10 @@ void sendData(cv::Point p) {
     char point_string[] = "test";
     
 
+    //convert point to degree data that can be sent to arduino
+    
+    
+    
     SerialPort* arduino = new SerialPort(kPortName);
 
     if (!arduino->writeSerialPort(point_string, kDataLength)) {
