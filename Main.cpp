@@ -14,6 +14,14 @@
 
 #include "Library/SerialPort.hpp"
 
+#define MAX_DATA_LENGTH 20
+
+constexpr char kport_name[] = "\\\\.\\COM20";
+
+
+bool checkConnection();
+void sendData(cv::Point p);
+
 
 int main(int argc, char** argv)
 {
@@ -33,7 +41,7 @@ int main(int argc, char** argv)
         capture >> frame;
         if (frame.empty())
             break;
-        
+
         //convert to gray
         cv::cvtColor(frame, frame_HSV, cv::COLOR_RGB2HSV);
 
@@ -51,22 +59,22 @@ int main(int argc, char** argv)
         //calculate center of body
         cv::Moments m = moments(thresh_frame, false);
         cv::Point com(m.m10 / m.m00, m.m01 / m.m00);
-        
+
 
         //if the coords are on screen, display red cross
         if (!(com.x < 0 || com.y < 0)) {
             cv::Scalar color = cv::Scalar(0, 0, 255);
-            drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
+            cv::drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
         }
-        
+
         //display coord to terminal
         std::cout << com << std::endl;
 
-    
+
         //display image
-        imshow("thresh", thresh_frame);
-        imshow("hsv", frame_HSV);
-        imshow("w", frame);
+        cv::imshow("thresh", thresh_frame);
+        cv::imshow("hsv", frame_HSV);
+        cv::imshow("w", frame);
 
 
 
@@ -79,21 +87,54 @@ int main(int argc, char** argv)
         //once trajectory is predicted, save coordinates to a Point
 
 
-        //convert point to radian data that can be sent to arduino
+        //convert point to degree data that can be sent to arduino
 
-
-        //send data to arduino
-
-
+     
 
 
     }
-    
 
+    cv::Point p;
 
-
+    //send data to arduino
+    if (checkConnection()) {
+        sendData(p);
+    }
 
     cv::waitKey(0); // key press to close window
     return 0;
 }
 
+void sendData(cv::Point p) {
+    
+    char point_string[] = "test";
+    
+
+    SerialPort* arduino = new SerialPort(kport_name);
+
+    if (!arduino->writeSerialPort(point_string, MAX_DATA_LENGTH)) {
+        std::cout << "Error writing to port: " << kport_name << std::endl;
+    }
+
+}
+
+bool checkConnection() {
+    while (1) {
+        std::cout << "Searching...";
+
+        SerialPort* arduino = new SerialPort(kport_name);
+
+        while (!arduino->isConnected()) {
+            Sleep(100);
+            std::cout << ".";
+            arduino = new SerialPort(kport_name);
+        }
+
+        //Checking if arduino is connected or not
+        if (arduino->isConnected()) {
+            std::cout << std::endl << "Connection established at port " << kport_name << std::endl;
+            return true;
+        }
+        return false;
+    }
+}
