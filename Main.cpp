@@ -15,6 +15,7 @@
 #include "Library/SerialPort.hpp"
 
 #define MAX_DATA_LENGTH 20
+#define NUM_CALC_FRAMES 20
 #define NUM_PREDICTED_FRAMES 15
 
 constexpr char kport_name[] = "\\\\.\\COM20";
@@ -22,7 +23,7 @@ constexpr char kport_name[] = "\\\\.\\COM20";
 
 bool checkConnection();
 void sendData(cv::Point p);
-cv::Point calculateTrajectory(cv::Point p[]);
+int calculateTrajectory(int p[]);
 
 int main(int argc, char** argv)
 {
@@ -32,8 +33,8 @@ int main(int argc, char** argv)
     //VideoCapture Capture;
     //capture.open(0);
     cv::Mat frame, frame_HSV;
-    cv::Point frame_data[20];
-    cv::Point predicted;
+    int frame_data_x[NUM_CALC_FRAMES];
+    int predicted_x;
     int frame_count = 0;
 
     if (!capture.isOpened())
@@ -73,11 +74,11 @@ int main(int argc, char** argv)
             cv::drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
 
             while (frame_count < 20) {          
-                frame_data[frame_count] = com;
+                frame_data_x[frame_count] = com.x;
                 frame_count++;
             }
             if (frame_count == 20) {
-                predicted = calculateTrajectory(frame_data);
+                predicted_x = calculateTrajectory(frame_data_x);
             }
         }
 
@@ -95,10 +96,10 @@ int main(int argc, char** argv)
         cv::waitKey(15);
 
 
-        //after n number of frames, use marker locations to calculate predicted trajectory k frames in the future
+        //after n number of frames, use marker locations to calculate predicted_x trajectory k frames in the future
 
 
-        //once trajectory is predicted, save coordinates to a Point
+        //once trajectory is predicted_x, save coordinates to a Point
 
 
         //convert point to degree data that can be sent to arduino
@@ -153,42 +154,53 @@ bool checkConnection() {
     }
 }
 
-cv::Point calculateTrajectory(cv::Point p[]){
-    int p_position, p_velocity, p_s_velocity, p_acceleration, p_s_acceleration;
-    int c_position, c_velocity, c_s_velocity, c_acceleration, c_s_acceleration;
+int calculateTrajectory(int p[]){
+
+    
+    int p_position = p[1], p_velocity = 0, p_s_velocity = 0, p_acceleration = 0, p_s_acceleration;
+    int c_position = p[0], c_velocity = 0, c_s_velocity = 0, c_acceleration = 0, c_s_acceleration;
     int f_position[20];
     
 
-    // +Velocity
-    if (c_position >= p_position) {
-        c_velocity = c_position - p_position;
-        c_s_velocity = 1;
-    }
-    // -Velocity
-    if (c_position < p_position) {
-        c_velocity = p_position - c_position;
-        c_s_velocity = 0;
-    }
-    // Accelerating
-    if (c_velocity >= p_velocity) {
-        c_acceleration = c_velocity - p_velocity;
-        c_s_acceleration = c_s_acceleration;
-    }
-    // Decelerating
-    if (c_velocity < p_velocity) {
-        c_acceleration = p_velocity - c_velocity;
-        c_s_acceleration = c_s_velocity ^ 1;
-    }
-    // Inflection Point
-    if ((c_s_velocity ^ p_s_acceleration) == 1) {
-        c_acceleration = c_position + p_position;
-        c_s_acceleration = c_s_velocity;
-    }
+    for (int i = 0; i < NUM_CALC_FRAMES; i++) {
 
-    //Next, the path is predicted by incrementally adding the acceleration to the velocity
+        p_velocity = c_velocity;
+        p_acceleration = c_acceleration;
+        p_s_velocity = c_s_velocity;
+
+        // +Velocity
+        if (c_position >= p_position) {
+            c_velocity = c_position - p_position;
+            c_s_velocity = 1;
+        }
+        // -Velocity
+        if (c_position < p_position) {
+            c_velocity = p_position - c_position;
+            c_s_velocity = 0;
+        }
+        // Accelerating
+        if (c_velocity >= p_velocity) {
+            c_acceleration = c_velocity - p_velocity;
+            c_s_acceleration = c_s_velocity;
+        }
+        // Decelerating
+        if (c_velocity < p_velocity) {
+            c_acceleration = p_velocity - c_velocity;
+            c_s_acceleration = c_s_velocity ^ 1;
+        }
+        // Inflection Point
+        if ((c_s_velocity ^ p_s_velocity) == 1) {
+            c_acceleration = c_position + p_position;
+            c_s_acceleration = c_s_velocity;
+        }
+    }
+    //Next, the path is predicted_x by incrementally adding the acceleration to the velocity
     //then this sum to the position
 
-    for (int i = 0; i < NUM_PREDICTED_FRAMES; i++) {
+    f_position[0] = p_position;
+    f_position[1] = c_position;
+
+    for (int i = 1; i < NUM_PREDICTED_FRAMES; i++) {
         if (c_s_velocity != 0) {
             if (c_s_acceleration != 0) {
                 f_position[i] = f_position[i - 1] + c_velocity + c_acceleration;
@@ -207,4 +219,30 @@ cv::Point calculateTrajectory(cv::Point p[]){
         }
     }
 
+    return f_position[NUM_PREDICTED_FRAMES - 1];
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
