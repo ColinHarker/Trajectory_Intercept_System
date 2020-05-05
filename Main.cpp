@@ -5,7 +5,8 @@
 * _STATUS_: WIP
 */
 
-
+#include <thread>
+#include <future>
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
@@ -14,6 +15,15 @@
 
 #include "Library/SerialPort.hpp"
 
+constexpr int kDataLength = 20;
+constexpr int kNumCalcFrames = 20;
+constexpr int kNumPredictedFrames = 15;
+constexpr char kPortName[] = "\\\\.\\COM20";
+
+
+bool checkConnection();
+void sendData(cv::Point p);
+int calculateTrajectory(int p[]);
 
 int main(int argc, char** argv)
 {
@@ -23,17 +33,24 @@ int main(int argc, char** argv)
     //VideoCapture Capture;
     //capture.open(0);
     cv::Mat frame, frame_HSV;
+    int frame_data_x[kNumCalcFrames];
+    int frame_data_y[kNumCalcFrames];
+    int predicted_x;
+    int predicted_y;
+    int frame_count = 0;
 
     if (!capture.isOpened())
         throw "Error when reading mov";
-
+    if (!checkConnection) {
+        std::cout << "Error: Cannot establish connection to port: " << kPortName << std::endl;
+        return 1;
+    }
     cv::namedWindow("w", 1);
-    for (;;)
-    {
+    for (;;){
         capture >> frame;
         if (frame.empty())
             break;
-        
+
         //convert to gray
         cv::cvtColor(frame, frame_HSV, cv::COLOR_RGB2HSV);
 
@@ -51,49 +68,189 @@ int main(int argc, char** argv)
         //calculate center of body
         cv::Moments m = moments(thresh_frame, false);
         cv::Point com(m.m10 / m.m00, m.m01 / m.m00);
+
+        
         
 
         //if the coords are on screen, display red cross
         if (!(com.x < 0 || com.y < 0)) {
             cv::Scalar color = cv::Scalar(0, 0, 255);
-            drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
+            cv::drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
+
+            while (frame_count < 20) {          
+                frame_data_x[frame_count] = com.x;
+                frame_data_y[frame_count] = com.y;
+                frame_count++;
+            }
+            if (frame_count == 20) {
+                auto future_x = std::async(calculateTrajectory, frame_data_x);
+                auto future_y = std::async(calculateTrajectory, frame_data_y);
+                predicted_x = future_x.get;
+                predicted_y = future_y.get;
+
+                cv::Point predicted{ predicted_x, predicted_y };
+                sendData(predicted);
+                
+                frame_count++;
+            }
         }
-        
+
         //display coord to terminal
         std::cout << com << std::endl;
 
-    
+
         //display image
-        imshow("thresh", thresh_frame);
-        imshow("hsv", frame_HSV);
-        imshow("w", frame);
+        cv::imshow("thresh", thresh_frame);
+        cv::imshow("hsv", frame_HSV);
+        cv::imshow("w", frame);
 
 
 
         cv::waitKey(15);
 
 
-        //after n number of frames, use marker locations to calculate predicted trajectory k frames in the future
+        //after n number of frames, use marker locations to calculate predicted_x trajectory k frames in the future
 
 
-        //once trajectory is predicted, save coordinates to a Point
+        //once trajectory is predicted_x, save coordinates to a Point
 
 
-        //convert point to radian data that can be sent to arduino
+        //convert point to degree data that can be sent to arduino
 
-
-        //send data to arduino.
-
-
+     
 
 
     }
-    
-
 
 
 
     cv::waitKey(0); // key press to close window
     return 0;
 }
+
+void sendData(cv::Point p) {
+    
+    char point_string[] = "test";
+    
+
+    SerialPort* arduino = new SerialPort(kPortName);
+
+    if (!arduino->writeSerialPort(point_string, kDataLength)) {
+        std::cout << "Error writing to port: " << kPortName << std::endl;
+    }
+
+}
+
+bool checkConnection() {
+    while (1) {
+        std::cout << "Searching...";
+
+        SerialPort* arduino = new SerialPort(kPortName);
+
+        while (!arduino->isConnected()) {
+            Sleep(100);
+            std::cout << ".";
+            arduino = new SerialPort(kPortName);
+        }
+
+        //Checking if arduino is connected or not
+        if (arduino->isConnected()) {
+            std::cout << std::endl << "Connection established at port " << kPortName << std::endl;
+            return true;
+        }
+        return false;
+    }
+}
+
+int calculateTrajectory(int p[]){
+
+    
+    int p_position = p[1], p_velocity = 0, p_s_velocity = 0, p_acceleration = 0, p_s_acceleration;
+    int c_position = p[0], c_velocity = 0, c_s_velocity = 0, c_acceleration = 0, c_s_acceleration;
+    int f_position[20];
+    
+
+    for (int i = 0; i < kNumCalcFrames; i++) {
+
+        p_velocity = c_velocity;
+        p_acceleration = c_acceleration;
+        p_s_velocity = c_s_velocity;
+
+        // +Velocity
+        if (c_position >= p_position) {
+            c_velocity = c_position - p_position;
+            c_s_velocity = 1;
+        }
+        // -Velocity
+        if (c_position < p_position) {
+            c_velocity = p_position - c_position;
+            c_s_velocity = 0;
+        }
+        // Accelerating
+        if (c_velocity >= p_velocity) {
+            c_acceleration = c_velocity - p_velocity;
+            c_s_acceleration = c_s_velocity;
+        }
+        // Decelerating
+        if (c_velocity < p_velocity) {
+            c_acceleration = p_velocity - c_velocity;
+            c_s_acceleration = c_s_velocity ^ 1;
+        }
+        // Inflection Point
+        if ((c_s_velocity ^ p_s_velocity) == 1) {
+            c_acceleration = c_position + p_position;
+            c_s_acceleration = c_s_velocity;
+        }
+    }
+    //Next, the path is predicted_x by incrementally adding the acceleration to the velocity
+    //then this sum to the position
+
+    f_position[0] = p_position;
+    f_position[1] = c_position;
+
+    for (int i = 1; i < kNumPredictedFrames; i++) {
+        if (c_s_velocity != 0) {
+            if (c_s_acceleration != 0) {
+                f_position[i] = f_position[i - 1] + c_velocity + c_acceleration;
+            }
+            if (c_s_acceleration == 0) {
+                f_position[i] = f_position[i - 1] + c_velocity - c_acceleration;
+            }
+        }
+        if (c_s_velocity == 0) {
+            if (c_s_acceleration != 0) {
+                f_position[i] = f_position[i - 1] - c_velocity + c_acceleration;
+            }
+            if (c_s_acceleration == 0) {
+                f_position[i] = f_position[i - 1] - c_velocity - c_acceleration;
+            }
+        }
+    }
+
+    return f_position[kNumPredictedFrames - 1];
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
