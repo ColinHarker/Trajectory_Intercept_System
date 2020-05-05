@@ -97,7 +97,7 @@ int main(int argc, char** argv)
     cv::Point p;
 
     //send data to arduino
-    if (checkConnection()) {
+    if (checkConnection()) { //check connection to port
         sendData(p);
     }
 
