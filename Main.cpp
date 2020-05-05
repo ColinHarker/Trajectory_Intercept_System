@@ -15,13 +15,14 @@
 #include "Library/SerialPort.hpp"
 
 #define MAX_DATA_LENGTH 20
+#define NUM_PREDICTED_FRAMES 15
 
 constexpr char kport_name[] = "\\\\.\\COM20";
 
 
 bool checkConnection();
 void sendData(cv::Point p);
-
+cv::Point calculateTrajectory(cv::Point p[]);
 
 int main(int argc, char** argv)
 {
@@ -31,6 +32,9 @@ int main(int argc, char** argv)
     //VideoCapture Capture;
     //capture.open(0);
     cv::Mat frame, frame_HSV;
+    cv::Point frame_data[20];
+    cv::Point predicted;
+    int frame_count = 0;
 
     if (!capture.isOpened())
         throw "Error when reading mov";
@@ -60,11 +64,21 @@ int main(int argc, char** argv)
         cv::Moments m = moments(thresh_frame, false);
         cv::Point com(m.m10 / m.m00, m.m01 / m.m00);
 
+        
+        
 
         //if the coords are on screen, display red cross
         if (!(com.x < 0 || com.y < 0)) {
             cv::Scalar color = cv::Scalar(0, 0, 255);
             cv::drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
+
+            while (frame_count < 20) {          
+                frame_data[frame_count] = com;
+                frame_count++;
+            }
+            if (frame_count == 20) {
+                predicted = calculateTrajectory(frame_data);
+            }
         }
 
         //display coord to terminal
@@ -137,4 +151,60 @@ bool checkConnection() {
         }
         return false;
     }
+}
+
+cv::Point calculateTrajectory(cv::Point p[]){
+    int p_position, p_velocity, p_s_velocity, p_acceleration, p_s_acceleration;
+    int c_position, c_velocity, c_s_velocity, c_acceleration, c_s_acceleration;
+    int f_position[20];
+    
+
+    // +Velocity
+    if (c_position >= p_position) {
+        c_velocity = c_position - p_position;
+        c_s_velocity = 1;
+    }
+    // -Velocity
+    if (c_position < p_position) {
+        c_velocity = p_position - c_position;
+        c_s_velocity = 0;
+    }
+    // Accelerating
+    if (c_velocity >= p_velocity) {
+        c_acceleration = c_velocity - p_velocity;
+        c_s_acceleration = c_s_acceleration;
+    }
+    // Decelerating
+    if (c_velocity < p_velocity) {
+        c_acceleration = p_velocity - c_velocity;
+        c_s_acceleration = c_s_velocity ^ 1;
+    }
+    // Inflection Point
+    if ((c_s_velocity ^ p_s_acceleration) == 1) {
+        c_acceleration = c_position + p_position;
+        c_s_acceleration = c_s_velocity;
+    }
+
+    //Next, the path is predicted by incrementally adding the acceleration to the velocity
+    //then this sum to the position
+
+    for (int i = 0; i < NUM_PREDICTED_FRAMES; i++) {
+        if (c_s_velocity != 0) {
+            if (c_s_acceleration != 0) {
+                f_position[i] = f_position[i - 1] + c_velocity + c_acceleration;
+            }
+            if (c_s_acceleration == 0) {
+                f_position[i] = f_position[i - 1] + c_velocity - c_acceleration;
+            }
+        }
+        if (c_s_velocity == 0) {
+            if (c_s_acceleration != 0) {
+                f_position[i] = f_position[i - 1] - c_velocity + c_acceleration;
+            }
+            if (c_s_acceleration == 0) {
+                f_position[i] = f_position[i - 1] - c_velocity - c_acceleration;
+            }
+        }
+    }
+
 }
