@@ -1,6 +1,5 @@
 #ifndef PORT_H
 #define PORT_H
-#pragma once
 #include <opencv2\core\types.hpp>
 
 bool checkConnection();

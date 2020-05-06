@@ -1,6 +1,5 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
-#pragma once
 
 namespace constants {
 	constexpr int kDataLength = 20;
