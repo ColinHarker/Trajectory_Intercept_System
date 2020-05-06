@@ -27,8 +27,9 @@
 #include "Library/SerialPort.hpp"
 
 constexpr int kDataLength = 20;
-constexpr int kNumCalcFrames = 20;
-constexpr int kNumPredictedFrames = 15;
+constexpr int kNumCalcFrames = 5;
+constexpr int kNumPredictedFrames = 5;
+constexpr int kStartFrame = 20;
 constexpr char kPortName[] = "\\\\.\\COM20";
 
 
@@ -38,25 +39,35 @@ int calculateTrajectory(int p[]);
 
 int main(int argc, char** argv)
 {
+
     std::string filename = "test3.mov";
     cv::VideoCapture capture(filename);
     //--for webcam--
     //VideoCapture Capture;
     //capture.open(0);
+
+
     cv::Mat frame, frame_HSV;
+
     int frame_data_x[kNumCalcFrames];
     int frame_data_y[kNumCalcFrames];
     int predicted_x;
     int predicted_y;
     int frame_count = 0;
+    int index = 0;
+
     cv::Point predicted_point;
 
     if (!capture.isOpened())
         throw "Error when reading mov";
-    if (!checkConnection) {
+    if (!checkConnection()) {
         std::cout << "Error: Cannot establish connection to port: " << kPortName << std::endl;
         return 1;
     }
+
+
+    bool p = false;
+
     cv::namedWindow("w", 1);
     for (;;){
         capture >> frame;
@@ -88,24 +99,34 @@ int main(int argc, char** argv)
         if (!(com.x < 0 || com.y < 0)) {
             cv::Scalar color = cv::Scalar(0, 0, 255);
             cv::drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
-
-            while (frame_count < 20) {          
-                frame_data_x[frame_count] = com.x;
-                frame_data_y[frame_count] = com.y;
+            
+           
+            if(frame_count <= kStartFrame + kNumCalcFrames && frame_count > kStartFrame) {          
+               
+                frame_data_x[index] = com.x;
+                frame_data_y[index] = com.y;
+                
+                index++;
                 frame_count++;
-            }
-            if (frame_count == 20) {
+
+            }else if(frame_count == kStartFrame + kNumCalcFrames + 1) {
+                
                 auto future_x = std::async(calculateTrajectory, frame_data_x);
                 auto future_y = std::async(calculateTrajectory, frame_data_y);
-                predicted_x = future_x.get;
-                predicted_y = future_y.get;
+                predicted_x = future_x.get();
+                predicted_y = future_y.get();
 
                 predicted_point = { predicted_x, predicted_y };
                 sendData(predicted_point);
-                
+               
+                p = true;
+                frame_count++;
+            }else {
                 frame_count++;
             }
-            cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);
+
+            if (frame_count == kStartFrame + kNumCalcFrames + kNumPredictedFrames + 1) p = false; //turn marker off after frame has passed the predicted frame
+            if(p)cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);  //display the predicted point
         }
 
         //display coord to terminal
@@ -113,13 +134,12 @@ int main(int argc, char** argv)
 
 
         //display image
-        cv::imshow("thresh", thresh_frame);
-        cv::imshow("hsv", frame_HSV);
+        //cv::imshow("thresh", thresh_frame);
+        //cv::imshow("hsv", frame_HSV);
         cv::imshow("w", frame);
 
 
-        cv::waitKey(15);
-
+        cv::waitKey(0);      
     }
 
 
@@ -147,12 +167,12 @@ void sendData(cv::Point p) {
 
 bool checkConnection() {
     while (1) {
-        std::cout << "Searching...";
+        std::cout << "\n\nSearching...\n";
 
         SerialPort* arduino = new SerialPort(kPortName);
 
         while (!arduino->isConnected()) {
-            Sleep(100);
+            Sleep(300);
             std::cout << ".";
             arduino = new SerialPort(kPortName);
         }
@@ -169,25 +189,22 @@ bool checkConnection() {
 int calculateTrajectory(int p[]){
 
     
-    int p_position = p[1], p_velocity = 0, p_s_velocity = 0, p_acceleration = 0, p_s_acceleration;
-    int c_position = p[0], c_velocity = 0, c_s_velocity = 0, c_acceleration = 0, c_s_acceleration;
-    int f_position[20];
+    int p_position = p[0], p_velocity = 0, p_s_velocity = 0, p_acceleration = 0, p_s_acceleration;
+    int c_position = p[1], c_velocity = 0, c_s_velocity = 0, c_acceleration = 0, c_s_acceleration;
+    int f_position[kNumPredictedFrames];
     
 
-    for (int i = 0; i < kNumCalcFrames; i++) {
+    for (int i = 0; i < kNumCalcFrames-1; i++) {
 
-        p_velocity = c_velocity;
-        p_acceleration = c_acceleration;
-        p_s_velocity = c_s_velocity;
 
         // +Velocity
-        if (c_position >= p_position) {
-            c_velocity = c_position - p_position;
+        if (p[i+1] >= p[i]) {
+            c_velocity = p[i+1] - p[i];
             c_s_velocity = 1;
         }
         // -Velocity
-        if (c_position < p_position) {
-            c_velocity = p_position - c_position;
+        if (p[i+1] < p[i]) {
+            c_velocity = p[i] - p[i+1];
             c_s_velocity = 0;
         }
         // Accelerating
@@ -205,12 +222,16 @@ int calculateTrajectory(int p[]){
             c_acceleration = c_position + p_position;
             c_s_acceleration = c_s_velocity;
         }
+        
+        p_velocity = c_velocity;
+        p_acceleration = c_acceleration;
+        p_s_velocity = c_s_velocity;
     }
     //Next, the path is predicted_x by incrementally adding the acceleration to the velocity
     //then this sum to the position
 
-    f_position[0] = p_position;
-    f_position[1] = c_position;
+    f_position[0] = p[kNumCalcFrames-2]; //previous
+    f_position[1] = p[kNumCalcFrames-1]; //current
 
     for (int i = 1; i < kNumPredictedFrames; i++) {
         if (c_s_velocity != 0) {
@@ -233,28 +254,5 @@ int calculateTrajectory(int p[]){
 
     return f_position[kNumPredictedFrames - 1];
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
