@@ -25,9 +25,9 @@
 #include "opencv2/opencv.hpp"
 
 #include "Library/SerialPort.hpp"
-#include "constants.h"
-#include "Port.h"
-#include "TrajectoryCalc.h"
+#include "constants.hpp"
+#include "Port.hpp"
+#include "TrajectoryCalc.hpp"
 
 
 int main(int argc, char** argv)

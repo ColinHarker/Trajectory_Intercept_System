@@ -1,6 +1,6 @@
-#include "Port.h"
+#include "Port.hpp"
 #include "Library/SerialPort.hpp"
-#include "constants.h"
+#include "constants.hpp"
 
 void sendData(cv::Point p) {
 

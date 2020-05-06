@@ -1,5 +1,5 @@
-#include "TrajectoryCalc.h"
-#include "constants.h"
+#include "TrajectoryCalc.hpp"
+#include "constants.hpp"
 
 int calculateTrajectory(int p[]) {
 
