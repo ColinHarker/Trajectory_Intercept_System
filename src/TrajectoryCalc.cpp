@@ -1,7 +1,7 @@
 #include "TrajectoryCalc.hpp"
 #include "constants.hpp"
 
-int calculateTrajectory(int p[]) {
+int calculateTrajectory(int* p) {
 
 
     int p_position = p[0], p_velocity = 0, p_s_velocity = 0, p_acceleration = 0, p_s_acceleration;

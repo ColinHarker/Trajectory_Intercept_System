@@ -4,6 +4,7 @@
 
 bool checkConnection();
 void sendData(cv::Point p);
+char* convertPointData(cv::Point p);
 
 #endif // !PORT_H
 
