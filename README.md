@@ -22,7 +22,7 @@ Following are some links to help install OpenCV on mac, windows and linux:
 ### Run
 
 ```
-cd <Trajectory_Intercept_System_directory>
+cd <Trajectory_Intercept_System_Directory>
 cmake .
 make
 ./Trajectory_Intercept_System
