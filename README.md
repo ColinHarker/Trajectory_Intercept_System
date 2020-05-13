@@ -2,7 +2,11 @@
 C++ and Arduino project using OpenCV
 
 
-### Install
+### Installation
+
+```
+git clone https://github.com/ColinHarker/Trajectory_Intercept_System.git
+```
 
 This project files requires the installation of **OpenCV**:
 
@@ -17,8 +21,11 @@ Following are some links to help install OpenCV on mac, windows and linux:
 
 ### Run
 
-```c++
-g++ {file_name}
+```
+cd <Trajectory_Intercept_System_directory>
+cmake .
+make
+./Trajectory_Intercept_System
 ```  
 
 ### Quick Start
