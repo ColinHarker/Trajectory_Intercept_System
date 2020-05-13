@@ -19,15 +19,7 @@
 #include <thread>
 #include <future>
 
-#include "opencv2/core/core.hpp"
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/imgproc.hpp"
-#include "opencv2/opencv.hpp"
-
-#include "Library/SerialPort.hpp"
-#include "constants.hpp"
-#include "Port.hpp"
-#include "TrajectoryCalc.hpp"
+#include "Linker.hpp"
 
 
 int main(int argc, char** argv)
