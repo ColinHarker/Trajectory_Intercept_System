@@ -81,3 +81,5 @@ auto future_y = std::async(calculateTrajectory, frame_data_y);
 
 
 ## About
+
+This project was created to make a nerf gun turret be able to track and fire a dart to intercept an object flying through the air
