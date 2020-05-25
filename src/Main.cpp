@@ -25,7 +25,7 @@
 int main(int argc, char** argv)
 {
 
-    std::string filename = "test3.mov";
+    const std::string filename = "test3.mov";
     cv::VideoCapture capture(filename);
     //--for webcam--
     //VideoCapture Capture;
@@ -34,24 +34,21 @@ int main(int argc, char** argv)
 
     cv::Mat frame, frame_HSV;
 
-    int frame_data_x[constants::kNumCalcFrames];
-    int frame_data_y[constants::kNumCalcFrames];
-    int predicted_x;
-    int predicted_y;
-    int frame_count = 0;
+    std::array<int, constants::kNumCalcFrames> frame_data_x;
+    std::array<int, constants::kNumCalcFrames> frame_data_y;
     int index = 0;
-
+    size_t frame_count = 0;
     cv::Point predicted_point;
 
     if (!capture.isOpened())
         throw "Error when reading mov";
-    if (!checkConnection()) {
+   /* if (!checkConnection()) {
         std::cout << "Error: Cannot establish connection to port: " << constants::kPortName << std::endl;
         return 1;
-    }
+    }*/
 
 
-    bool p = false;
+    bool show_marker = false;
 
     cv::namedWindow("w", 1);
     for (;;){
@@ -96,22 +93,22 @@ int main(int argc, char** argv)
 
             }else if(frame_count == constants::kStartFrame + constants::kNumCalcFrames + 1) {
                 
-                auto future_x = std::async(calculateTrajectory, frame_data_x);
-                auto future_y = std::async(calculateTrajectory, frame_data_y);
-                predicted_x = future_x.get();
-                predicted_y = future_y.get();
+                auto future_x = std::async([&frame_data_x]() { return calculateTrajectory(frame_data_x); });
+                auto future_y = std::async([&frame_data_y]() { return calculateTrajectory(frame_data_y); });
+                const int predicted_x = future_x.get();
+                const int predicted_y = future_y.get();
 
                 predicted_point = { predicted_x, predicted_y };
                 sendData(predicted_point);
                
-                p = true;
+                show_marker = true;
                 frame_count++;
             }else {
                 frame_count++;
             }
 
-            if (frame_count == constants::kStartFrame + constants::kNumCalcFrames + constants::kNumPredictedFrames + 1) p = false; //turn marker off after frame has passed the predicted frame
-            if(p)cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);  //display the predicted point
+            if (show_marker) cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);  //display the predicted point
+            if (frame_count == constants::kStartFrame + constants::kNumCalcFrames + constants::kNumPredictedFrames + 1) show_marker = false; //turn marker off after frame has passed the predicted frame
         }
 
         //display coord to terminal
