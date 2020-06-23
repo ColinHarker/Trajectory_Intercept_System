@@ -82,7 +82,7 @@ int main(int argc, char** argv)
             cv::Scalar color = cv::Scalar(0, 0, 255);
             cv::drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
             
-           
+            //if the current frame is within the window for aquiring trajectory data 
             if(frame_count <= constants::kStartFrame + constants::kNumCalcFrames && frame_count > constants::kStartFrame) {
                
                 frame_data_x[index] = com.x;
@@ -90,15 +90,19 @@ int main(int argc, char** argv)
                 
                 index++;
                 frame_count++;
-
+            
+            //once we leave the window to calculate data
             }else if(frame_count == constants::kStartFrame + constants::kNumCalcFrames + 1) {
                 
+                //send x and y coord data to the calculate trajectory function
                 auto future_x = std::async([&frame_data_x]() { return calculateTrajectory(frame_data_x); });
                 auto future_y = std::async([&frame_data_y]() { return calculateTrajectory(frame_data_y); });
                 const int predicted_x = future_x.get();
                 const int predicted_y = future_y.get();
 
                 predicted_point = { predicted_x, predicted_y };
+
+                //sending the predicted coord of trajectory
                 sendData(predicted_point);
                
                 show_marker = true;
@@ -106,9 +110,11 @@ int main(int argc, char** argv)
             }else {
                 frame_count++;
             }
+            //display the predicted point
+            if (show_marker) cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);  
 
-            if (show_marker) cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);  //display the predicted point
-            if (frame_count == constants::kStartFrame + constants::kNumCalcFrames + constants::kNumPredictedFrames + 1) show_marker = false; //turn marker off after frame has passed the predicted frame
+            //turn marker off after frame has passed the predicted frame
+            if (frame_count == constants::kStartFrame + constants::kNumCalcFrames + constants::kNumPredictedFrames + 1) show_marker = false; 
         }
 
         //display coord to terminal
