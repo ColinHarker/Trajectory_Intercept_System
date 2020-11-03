@@ -20,38 +20,45 @@
 #include <future>
 
 #include "Linker.hpp"
+#define FILENAME "test3.mov"
+
+void run(cv::VideoCapture&);
+
+cv::Mat frame, frame_HSV;
+cv::Point predicted_point;
 
 
 int main(int argc, char** argv)
 {
-
-    const std::string filename = "test3.mov";
-    cv::VideoCapture capture(filename);
+    cv::VideoCapture capture(FILENAME);
     //--for webcam--
     //VideoCapture Capture;
     //capture.open(0);
 
-
-    cv::Mat frame, frame_HSV;
-
-    std::array<int, constants::kNumCalcFrames> frame_data_x;
-    std::array<int, constants::kNumCalcFrames> frame_data_y;
-    int index = 0;
-    size_t frame_count = 0;
-    cv::Point predicted_point;
-
     if (!capture.isOpened())
         throw "Error when reading mov";
-   /* if (!checkConnection()) {
+   
+    if (!checkConnection()) {
         std::cout << "Error: Cannot establish connection to port: " << constants::kPortName << std::endl;
         return 1;
-    }*/
+    }
+    
+    run(capture);
+
+    return 0;
+}
 
 
+void run(cv::VideoCapture& capture) {
+    
+    size_t frame_count = 0;
+    std::array<int, constants::kNumCalcFrames> frame_data_x;
+    std::array<int, constants::kNumCalcFrames> frame_data_y;
     bool show_marker = false;
-
     cv::namedWindow("w", 1);
-    for (;;){
+    int index = 0;
+
+    while (true) {
         capture >> frame;
         if (frame.empty())
             break;
@@ -74,26 +81,27 @@ int main(int argc, char** argv)
         cv::Moments m = moments(thresh_frame, false);
         cv::Point com(m.m10 / m.m00, m.m01 / m.m00);
 
-        
-        
+
+
 
         //if the coords are on screen, display red cross
         if (!(com.x < 0 || com.y < 0)) {
             cv::Scalar color = cv::Scalar(0, 0, 255);
             cv::drawMarker(frame, com, color, cv::MARKER_CROSS, 25, 2);
-            
+
             //if the current frame is within the window for aquiring trajectory data 
-            if(frame_count <= constants::kStartFrame + constants::kNumCalcFrames && frame_count > constants::kStartFrame) {
-               
+            if (frame_count <= constants::kStartFrame + constants::kNumCalcFrames && frame_count > constants::kStartFrame) {
+
                 frame_data_x[index] = com.x;
                 frame_data_y[index] = com.y;
-                
+
                 index++;
                 frame_count++;
-            
-            //once we leave the window to calculate data
-            }else if(frame_count == constants::kStartFrame + constants::kNumCalcFrames + 1) {
-                
+
+                //once we leave the window to calculate data
+            }
+            else if (frame_count == constants::kStartFrame + constants::kNumCalcFrames + 1) {
+
                 //send x and y coord data to the calculate trajectory function
                 auto future_x = std::async([&frame_data_x]() { return calculateTrajectory(frame_data_x); });
                 auto future_y = std::async([&frame_data_y]() { return calculateTrajectory(frame_data_y); });
@@ -104,17 +112,18 @@ int main(int argc, char** argv)
 
                 //sending the predicted coord of trajectory
                 sendData(predicted_point);
-               
+
                 show_marker = true;
                 frame_count++;
-            }else {
+            }
+            else {
                 frame_count++;
             }
             //display the predicted point
-            if (show_marker) cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);  
+            if (show_marker) cv::drawMarker(frame, predicted_point, color, cv::MARKER_DIAMOND, 20, 2);
 
             //turn marker off after frame has passed the predicted frame
-            if (frame_count == constants::kStartFrame + constants::kNumCalcFrames + constants::kNumPredictedFrames + 1) show_marker = false; 
+            if (frame_count == constants::kStartFrame + constants::kNumCalcFrames + constants::kNumPredictedFrames + 1) show_marker = false;
         }
 
         //display coord to terminal
@@ -127,13 +136,8 @@ int main(int argc, char** argv)
         cv::imshow("w", frame);
 
 
-        cv::waitKey(0);      
+        cv::waitKey(0);
     }
-
-
-
-    cv::waitKey(0); // key press to close window
-    return 0;
 }
 
 
