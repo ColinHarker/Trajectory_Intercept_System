@@ -10,6 +10,7 @@
 #include "constants.hpp"
 #include "Port.hpp"
 #include "TrajectoryCalc.hpp"
+#include "Functions.h"
 
 
 #endif // !Linker_H
